@@ -10,7 +10,31 @@
 //
 
 import Foundation
+import UIKit
 import WatchConnectivity
+
+/// Decodes the scoreboard server's GET /<username>/api/score response
+/// (github.com/Lindhardsen/scoreboard). Kept private to this file since it's
+/// purely a wire-format detail of talking to that server — WatchScoreSnapshot
+/// in Shared/WatchControlProtocol.swift is the stable iPhone<->Watch shape.
+private struct ScoreboardServerResponse: Decodable {
+    struct Team: Decodable {
+        var name: String
+        var sets: Int
+        var points: Int
+    }
+    var home: Team
+    var away: Team
+    var matchEnded: Bool
+
+    var snapshot: WatchScoreSnapshot {
+        WatchScoreSnapshot(
+            teamA: home.name, teamB: away.name,
+            setsA: home.sets, setsB: away.sets,
+            pointsA: home.points, pointsB: away.points
+        )
+    }
+}
 
 @MainActor
 final class WatchSessionManager: NSObject, WCSessionDelegate {
@@ -18,10 +42,13 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
 
     private nonisolated static let payloadKey = "payload"
     private static let pushInterval: Duration = .seconds(2)
+    private static let scoreboardPollInterval: Duration = .seconds(5)
 
     var appState: AppState?
     private var pushTask: Task<Void, Never>?
     private var lastPushedSnapshot: WatchStateSnapshot?
+    private var scoreboardPollTask: Task<Void, Never>?
+    private var latestScoreboard: WatchScoreSnapshot?
 
     func start(appState: AppState) {
         self.appState = appState
@@ -30,6 +57,7 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
         session.delegate = self
         session.activate()
         startPushLoop()
+        startScoreboardPollLoop()
     }
 
     private func startPushLoop() {
@@ -40,6 +68,50 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
                 try? await Task.sleep(for: Self.pushInterval)
             }
         }
+    }
+
+    /// Separate from the push loop above since this does real network I/O
+    /// with its own cadence and failure handling, unlike the local-state-only
+    /// snapshot push. Deliberately limited to while actively streaming and
+    /// in the foreground — per-user request, and it also matches what iOS
+    /// would allow by default anyway: ordinary background execution gets
+    /// suspended within seconds, so an indefinite background poll loop
+    /// wouldn't actually keep running without extra entitlements this
+    /// feature doesn't need.
+    private func startScoreboardPollLoop() {
+        scoreboardPollTask?.cancel()
+        scoreboardPollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.pollScoreboardIfNeeded()
+                try? await Task.sleep(for: Self.scoreboardPollInterval)
+            }
+        }
+    }
+
+    private func pollScoreboardIfNeeded() async {
+        guard let appState, appState.isStreamActive,
+              UIApplication.shared.applicationState == .active,
+              let url = Self.scoreboardScoreURL() else {
+            latestScoreboard = nil
+            return
+        }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            latestScoreboard = try JSONDecoder().decode(ScoreboardServerResponse.self, from: data).snapshot
+        } catch {
+            // Keep showing the last known score rather than flicker it away
+            // on one transient failure (the scraper itself may be between
+            // polls, or the network hiccuped).
+            LOG("Could not fetch scoreboard score: \(error.localizedDescription)", level: .debug)
+        }
+    }
+
+    private static func scoreboardScoreURL() -> URL? {
+        let base = Settings.scoreboardServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let username = Settings.scoreboardUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !base.isEmpty, !username.isEmpty else { return nil }
+        let trimmedBase = base.hasSuffix("/") ? String(base.dropLast()) : base
+        return URL(string: "\(trimmedBase)/\(username)/api/score")
     }
 
     private func pushStateIfNeeded() {
@@ -68,9 +140,7 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
             batteryPercent: content.batteryPercent,
             canSaveHighlight: content.canSaveHighlight,
             highlightStatus: content.highlightStatus,
-            // Populated once the scoreboard-server relay lands; the Watch UI
-            // already renders this shape today.
-            scoreboard: nil
+            scoreboard: latestScoreboard
         )
     }
 

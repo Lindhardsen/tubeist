@@ -250,6 +250,8 @@ private struct AppliedSettingsSnapshot {
     let overlays: [OverlaySetting]
     let overlayRefreshRate: OverlayRefreshRate
     let activityPreferences: StreamActivityPreferences
+    let scoreboardServerURL: String
+    let scoreboardUsername: String
 #if DEBUG
     let captureRemuxFixtures: Bool
     let recordHLSAcceptance: Bool
@@ -280,6 +282,8 @@ private struct AppliedSettingsSnapshot {
             overlays: overlays,
             overlayRefreshRate: Settings.overlayRefreshRate,
             activityPreferences: .saved,
+            scoreboardServerURL: Settings.scoreboardServerURL,
+            scoreboardUsername: Settings.scoreboardUsername,
             captureRemuxFixtures: Settings.captureRemuxFixtures,
             recordHLSAcceptance: Settings.recordHLSAcceptance,
             manualHLSEndingTest: Settings.manualHLSEndingTest
@@ -306,7 +310,9 @@ private struct AppliedSettingsSnapshot {
             youtubeThumbnailData: try Settings.loadYouTubeThumbnailData(),
             overlays: overlays,
             overlayRefreshRate: Settings.overlayRefreshRate,
-            activityPreferences: .saved
+            activityPreferences: .saved,
+            scoreboardServerURL: Settings.scoreboardServerURL,
+            scoreboardUsername: Settings.scoreboardUsername
         )
 #endif
     }
@@ -335,6 +341,8 @@ private struct AppliedSettingsSnapshot {
         Settings.liveActivityDetail = activityPreferences.detail
         Settings.liveActivityAlerts = activityPreferences.alerts
         Settings.liveActivityRecoveryAlerts = activityPreferences.recoveryAlerts
+        Settings.scoreboardServerURL = scoreboardServerURL
+        Settings.scoreboardUsername = scoreboardUsername
 #if DEBUG
         Settings.captureRemuxFixtures = captureRemuxFixtures
         Settings.recordHLSAcceptance = recordHLSAcceptance
@@ -370,6 +378,8 @@ struct SettingsView: View {
     @State private var activityPreferences = StreamActivityPreferences.saved
     @State private var activityPermissionDenied = false
     @State private var isRequestingActivityPermission = false
+    @State private var scoreboardServerURL: String = Settings.scoreboardServerURL
+    @State private var scoreboardUsername: String = Settings.scoreboardUsername
     @State private var journalDebug: Bool = Settings.journalDebug
 #if DEBUG
     @State private var captureRemuxFixtures: Bool = Settings.captureRemuxFixtures
@@ -913,6 +923,18 @@ struct SettingsView: View {
                     Text("Show session status and elapsed time on your iPhone and the Smart Stack on Apple Watch with watchOS 11 or later. Full adds viewers, bitrate, upload quality, temperature and battery. Alerts are optional; delivery depends on your device and notification settings.")
                 }
 
+                Section(header: Text("Watch App"), footer: Text("Shows the live score from a self-hosted scoreboard server (github.com/Lindhardsen/scoreboard) on the Watch app while streaming. Leave blank to turn this off. The score only refreshes while Tubeist is open and streaming.")) {
+                    TextField("Server URL (e.g. http://host:8081)", text: $scoreboardServerURL)
+                        .keyboardType(.URL)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                        .accessibilityIdentifier("scoreboardServerURL")
+                    TextField("Scoreboard Username", text: $scoreboardUsername)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                        .accessibilityIdentifier("scoreboardUsername")
+                }
+
                 Section(header: Text("Journal"), footer: Text("Configure which types of messages to record in the journal")) {
                     HStack {
                         Toggle("Error", isOn: $journalError).labelsHidden()
@@ -1444,6 +1466,8 @@ struct SettingsView: View {
         Settings.liveActivityDetail = activityPreferences.detail
         Settings.liveActivityAlerts = activityPreferences.alerts
         Settings.liveActivityRecoveryAlerts = activityPreferences.recoveryAlerts
+        Settings.scoreboardServerURL = scoreboardServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        Settings.scoreboardUsername = scoreboardUsername.trimmingCharacters(in: .whitespacesAndNewlines)
 #if DEBUG
         Settings.captureRemuxFixtures = captureRemuxFixtures
         Settings.recordHLSAcceptance = recordHLSAcceptance
@@ -1649,6 +1673,17 @@ final class Settings: Sendable {
     static var cameraPosition: String {
         get { UserDefaults.standard.string(forKey: "CameraPosition") ?? "stationary" }
         set { UserDefaults.standard.set(newValue, forKey: "CameraPosition") }
+    }
+    /// Base URL of a self-hosted scoreboard server (github.com/Lindhardsen/scoreboard
+    /// or upstream github.com/Roenbaeck/scoreboard), e.g. "http://host:8081".
+    /// Empty means the Watch score feature is off; nothing is fetched.
+    static var scoreboardServerURL: String {
+        get { UserDefaults.standard.string(forKey: "ScoreboardServerURL") ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: "ScoreboardServerURL") }
+    }
+    static var scoreboardUsername: String {
+        get { UserDefaults.standard.string(forKey: "ScoreboardUsername") ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: "ScoreboardUsername") }
     }
     static var journalError: Bool {
         get { bool(forKey: "JournalError", default: true) }

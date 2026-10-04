@@ -44,8 +44,8 @@ struct WatchStateSnapshot: Codable, Sendable, Equatable {
     var batteryPercent: Int?
     var canSaveHighlight: Bool
     var highlightStatus: HighlightStatus?
-    /// nil until the scoreboard-server integration (a later phase) populates
-    /// it; the Watch UI is built against this shape now regardless.
+    /// nil when no scoreboard server is configured in Settings, or while not
+    /// actively streaming (WatchSessionManager only polls it then).
     var scoreboard: WatchScoreSnapshot?
 
     static let idle = WatchStateSnapshot(
@@ -60,9 +60,8 @@ struct WatchStateSnapshot: Codable, Sendable, Equatable {
     )
 }
 
-/// Reserved shape for the live score, sourced from
-/// github.com/Lindhardsen/scoreboard in a follow-up phase. Defined now so
-/// the Watch UI has a stable, real shape to render against.
+/// Live score, sourced from a self-hosted scoreboard server
+/// (github.com/Lindhardsen/scoreboard) via WatchSessionManager's polling.
 struct WatchScoreSnapshot: Codable, Sendable, Equatable {
     var teamA: String
     var teamB: String

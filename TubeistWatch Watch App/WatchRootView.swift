@@ -122,8 +122,6 @@ private struct WatchHighlightButton: View {
     }
 }
 
-/// Renders now so the UI doesn't need to change once the scoreboard-server
-/// relay (a later phase) starts populating `score`.
 private struct WatchScoreView: View {
     let score: WatchScoreSnapshot?
 
