@@ -16,9 +16,16 @@ final class WatchConnectivityClient: NSObject, WCSessionDelegate {
     static let shared = WatchConnectivityClient()
 
     private nonisolated static let payloadKey = "payload"
+    /// WCSession.isReachable flips on its own (BLE/Wi-Fi radio renegotiation,
+    /// the Watch's screen waking/sleeping) independent of whether the phone
+    /// app is actually open, which made the Start button/"App not ready"
+    /// flicker. The UI-facing value only drops to unreachable after staying
+    /// that way for a bit; any "reachable" reading takes effect immediately.
+    private static let unreachableDebounce: Duration = .seconds(3)
 
     private(set) var snapshot: WatchStateSnapshot = .idle
     private(set) var isReachable = false
+    private var unreachableTask: Task<Void, Never>?
     /// Set on a failed command; the view clears it after showing an alert.
     var lastErrorMessage: String?
 
@@ -27,6 +34,19 @@ final class WatchConnectivityClient: NSObject, WCSessionDelegate {
         let session = WCSession.default
         session.delegate = self
         session.activate()
+    }
+
+    private func handleReachabilityChange(_ reachable: Bool) {
+        unreachableTask?.cancel()
+        if reachable {
+            isReachable = true
+        } else {
+            unreachableTask = Task { [weak self] in
+                try? await Task.sleep(for: Self.unreachableDebounce)
+                guard !Task.isCancelled else { return }
+                self?.isReachable = false
+            }
+        }
     }
 
     func sendStart() {
@@ -83,12 +103,16 @@ final class WatchConnectivityClient: NSObject, WCSessionDelegate {
         if let error {
             LOG("Watch session activation failed: \(error.localizedDescription)")
         }
+        let reachable = session.isReachable
+        Task { @MainActor in
+            WatchConnectivityClient.shared.handleReachabilityChange(reachable)
+        }
     }
 
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         let reachable = session.isReachable
         Task { @MainActor in
-            WatchConnectivityClient.shared.isReachable = reachable
+            WatchConnectivityClient.shared.handleReachabilityChange(reachable)
         }
     }
 
