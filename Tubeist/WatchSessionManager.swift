@@ -107,11 +107,10 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
     }
 
     private static func scoreboardScoreURL() -> URL? {
-        let base = Settings.scoreboardServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        let username = Settings.scoreboardUsername.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !base.isEmpty, !username.isEmpty else { return nil }
+        let base = Settings.scoreboardAPIURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !base.isEmpty else { return nil }
         let trimmedBase = base.hasSuffix("/") ? String(base.dropLast()) : base
-        return URL(string: "\(trimmedBase)/\(username)/api/score")
+        return URL(string: "\(trimmedBase)/api/score")
     }
 
     private func pushStateIfNeeded() {
@@ -140,6 +139,7 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
             batteryPercent: content.batteryPercent,
             canSaveHighlight: content.canSaveHighlight,
             highlightStatus: content.highlightStatus,
+            scoreboardConfigured: Self.scoreboardScoreURL() != nil,
             scoreboard: latestScoreboard
         )
     }

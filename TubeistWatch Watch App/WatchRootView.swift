@@ -20,7 +20,9 @@ struct WatchRootView: View {
                         .monospacedDigit()
                         .font(.caption)
                 }
-                WatchScoreView(score: snapshot.scoreboard)
+                if snapshot.scoreboardConfigured {
+                    WatchScoreView(score: snapshot.scoreboard)
+                }
                 startStopButton
                 if snapshot.canSaveHighlight {
                     WatchHighlightButton(status: snapshot.highlightStatus) {
@@ -134,7 +136,7 @@ private struct WatchScoreView: View {
                     .font(.title3).monospacedDigit()
             }
         } else {
-            Text("No score feed configured")
+            Text("Waiting for score…")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }

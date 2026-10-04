@@ -44,8 +44,13 @@ struct WatchStateSnapshot: Codable, Sendable, Equatable {
     var batteryPercent: Int?
     var canSaveHighlight: Bool
     var highlightStatus: HighlightStatus?
-    /// nil when no scoreboard server is configured in Settings, or while not
-    /// actively streaming (WatchSessionManager only polls it then).
+    /// Whether a Score API URL is set in Settings at all — independent of
+    /// `scoreboard` below, so the Watch can hide the whole score section
+    /// rather than show a placeholder when the feature is simply unused.
+    var scoreboardConfigured: Bool
+    /// nil while a Score API is configured but not actively streaming
+    /// (WatchSessionManager only polls it then), or before the first poll
+    /// completes.
     var scoreboard: WatchScoreSnapshot?
 
     static let idle = WatchStateSnapshot(
@@ -56,6 +61,7 @@ struct WatchStateSnapshot: Codable, Sendable, Equatable {
         batteryPercent: nil,
         canSaveHighlight: false,
         highlightStatus: nil,
+        scoreboardConfigured: false,
         scoreboard: nil
     )
 }
