@@ -1133,6 +1133,14 @@ struct SettingsView: View {
                     }
                     .navigationTitle("Edit Overlay")
                     .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") {
+                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            }
+                        }
+                    }
                     .onAppear {
                         // Initialize from the presented item. A sheet's first
                         // render can otherwise use stale values from its parent.
