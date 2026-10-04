@@ -29,7 +29,10 @@ struct WatchRootView: View {
                         client.sendHighlight()
                     }
                 }
-                if !client.isReachable {
+                // While idle, startStopButton already shows "App not ready" in
+                // place of the Start button, so this stays only for the case
+                // where reachability drops mid-stream.
+                if !client.isReachable, snapshot.phase != .ended, snapshot.phase != .failed {
                     Label("iPhone not reachable", systemImage: "iphone.slash")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -63,13 +66,22 @@ struct WatchRootView: View {
     private var startStopButton: some View {
         switch snapshot.phase {
         case .ended, .failed:
-            Button {
-                client.sendStart()
-            } label: {
-                Label("Start", systemImage: "dot.radiowaves.left.and.right")
-                    .frame(maxWidth: .infinity)
+            // sendStart() would just fail with "iPhone not reachable" if the
+            // phone app isn't running to receive it (e.g. fully closed), so
+            // show that upfront instead of a Start button that can't work.
+            if client.isReachable {
+                Button {
+                    client.sendStart()
+                } label: {
+                    Label("Start", systemImage: "dot.radiowaves.left.and.right")
+                        .frame(maxWidth: .infinity)
+                }
+                .tint(.red)
+            } else {
+                Label("App not ready", systemImage: "iphone.slash")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .tint(.red)
         case .preparing, .streaming, .recording, .finishing:
             // Stop ends a live broadcast, so it asks for confirmation rather
             // than acting on a single tap the way Start does.
