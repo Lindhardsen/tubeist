@@ -66,10 +66,10 @@ struct WatchRootView: View {
     private var startStopButton: some View {
         switch snapshot.phase {
         case .ended, .failed:
-            // sendStart() would just fail with "iPhone not reachable" if the
-            // phone app isn't running to receive it (e.g. fully closed), so
-            // show that upfront instead of a Start button that can't work.
-            if client.isReachable {
+            // isReachable alone isn't enough: it can stay true for a
+            // backgrounded-but-not-terminated phone app, but starting a
+            // stream should require the app actually be in the foreground.
+            if client.isReachable && snapshot.isAppActive {
                 Button {
                     client.sendStart()
                 } label: {

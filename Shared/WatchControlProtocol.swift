@@ -44,6 +44,13 @@ struct WatchStateSnapshot: Codable, Sendable, Equatable {
     var batteryPercent: Int?
     var canSaveHighlight: Bool
     var highlightStatus: HighlightStatus?
+    /// Whether the iPhone app is currently in the foreground. Starting a
+    /// stream needs the app active (camera/mic setup, YouTube broadcast
+    /// creation aren't things a backgrounded app should kick off from a
+    /// Watch tap), so the Watch uses this — not WCSession.isReachable, which
+    /// can stay true for a backgrounded-but-not-terminated app — to decide
+    /// whether to show Start at all.
+    var isAppActive: Bool
     /// Whether a Score API URL is set in Settings at all — independent of
     /// `scoreboard` below, so the Watch can hide the whole score section
     /// rather than show a placeholder when the feature is simply unused.
@@ -61,6 +68,7 @@ struct WatchStateSnapshot: Codable, Sendable, Equatable {
         batteryPercent: nil,
         canSaveHighlight: false,
         highlightStatus: nil,
+        isAppActive: false,
         scoreboardConfigured: false,
         scoreboard: nil
     )

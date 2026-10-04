@@ -58,6 +58,22 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
         session.activate()
         startPushLoop()
         startScoreboardPollLoop()
+        observeAppLifecycle()
+    }
+
+    /// Pushes immediately on a foreground/background transition rather than
+    /// waiting for the next pushLoop tick, since the Watch's Start button
+    /// gates on isAppActive and backgrounding can happen right before the
+    /// app gets suspended (and the loop with it).
+    private func observeAppLifecycle() {
+        let center = NotificationCenter.default
+        for name: Notification.Name in [UIApplication.didBecomeActiveNotification, UIApplication.didEnterBackgroundNotification] {
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in
+                    self?.pushStateIfNeeded()
+                }
+            }
+        }
     }
 
     private func startPushLoop() {
@@ -128,7 +144,13 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
 
     private func currentSnapshot(appState: AppState) -> WatchStateSnapshot {
         guard let activity = appState.activitySnapshot(preferences: appState.activityPreferences) else {
-            return .idle
+            // .idle's isAppActive/scoreboardConfigured are placeholders;
+            // those two are meaningful even with no activity session yet
+            // (e.g. app open but nothing started), so fill in the real values.
+            var idle = WatchStateSnapshot.idle
+            idle.isAppActive = UIApplication.shared.applicationState == .active
+            idle.scoreboardConfigured = Self.scoreboardScoreURL() != nil
+            return idle
         }
         let content = activity.content
         return WatchStateSnapshot(
@@ -139,6 +161,7 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
             batteryPercent: content.batteryPercent,
             canSaveHighlight: content.canSaveHighlight,
             highlightStatus: content.highlightStatus,
+            isAppActive: UIApplication.shared.applicationState == .active,
             scoreboardConfigured: Self.scoreboardScoreURL() != nil,
             scoreboard: latestScoreboard
         )
